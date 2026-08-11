@@ -1,8 +1,8 @@
-# DevOps AI Prompt Pack by MCPForge
+# DevOps AI Prompt Pack by WireForge
 
 > **8 battle-tested system prompts that turn any LLM into a senior DevOps engineer.** Complete with few-shot examples and structured output schemas for Claude, GPT-4, Cursor, VS Code Copilot, and any OpenAI-compatible API.
 >
-> *Part of the [MCPForge](https://mcpforge.dev) AI tooling collection.*
+> *Part of the [WireForge](https://wireforge.dev) AI tooling collection.*
 
 ---
 
@@ -265,4 +265,4 @@ Container Planner → CI/CD Designer → Cloud Cost Optimizer
 
 ---
 
-**Built by [MCPForge](https://mcpforge.dev) — engineers who've been on-call at 3 AM.** These prompts encode the patterns we wish we'd had when we started.
+**Built by [WireForge](https://wireforge.dev) — engineers who've been on-call at 3 AM.** These prompts encode the patterns we wish we'd had when we started.
