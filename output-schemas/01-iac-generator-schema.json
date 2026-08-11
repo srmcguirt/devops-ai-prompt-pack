@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IaC Generator Output",
+  "description": "Structured output schema for Infrastructure as Code generation responses",
+  "type": "object",
+  "required": ["architecture_summary", "files", "deployment_instructions"],
+  "properties": {
+    "architecture_summary": {
+      "type": "string",
+      "description": "1-2 sentence description of what infrastructure is being created and why"
+    },
+    "target_provider": {
+      "type": "string",
+      "enum": ["aws", "gcp", "azure", "multi-cloud"],
+      "description": "Primary cloud provider targeted"
+    },
+    "iac_tool": {
+      "type": "string",
+      "enum": ["terraform", "pulumi", "cloudformation", "cdk"],
+      "description": "Infrastructure as Code tool used"
+    },
+    "files": {
+      "type": "array",
+      "description": "Generated infrastructure files",
+      "items": {
+        "type": "object",
+        "required": ["filename", "content", "purpose"],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "File name with path (e.g., main.tf, modules/vpc/main.tf)"
+          },
+          "content": {
+            "type": "string",
+            "description": "Complete file content"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Brief description of what this file defines"
+          }
+        }
+      }
+    },
+    "variables": {
+      "type": "array",
+      "description": "Input variables that need to be configured",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "description"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "description": { "type": "string" },
+          "default": { "type": ["string", "number", "boolean", "null"] },
+          "required": { "type": "boolean" },
+          "sensitive": { "type": "boolean" },
+          "validation": { "type": "string", "description": "Validation rule description" }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "description": "Values exported for downstream consumption",
+      "items": {
+        "type": "object",
+        "required": ["name", "description"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "sensitive": { "type": "boolean" }
+        }
+      }
+    },
+    "deployment_instructions": {
+      "type": "object",
+      "required": ["prerequisites", "steps"],
+      "properties": {
+        "prerequisites": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Required tools, accounts, and configurations before deployment"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["order", "command", "description"],
+            "properties": {
+              "order": { "type": "integer" },
+              "command": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "estimated_monthly_cost": {
+      "type": "object",
+      "properties": {
+        "low": { "type": "string", "description": "Minimum estimated monthly cost" },
+        "high": { "type": "string", "description": "Maximum estimated monthly cost" },
+        "notes": { "type": "string", "description": "Cost estimation assumptions" }
+      }
+    },
+    "security_considerations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Security best practices applied and additional recommendations"
+    }
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "prompt_name": "Cloud Cost Optimizer",
+  "examples": [
+    {
+      "input": "Our AWS bill is $45,000/month. Biggest items: EC2 ($18,000), RDS ($8,000), data transfer ($6,000), S3 ($4,000), ECS/Fargate ($5,000), everything else ($4,000). We're a 20-person startup with staging and production environments. No Reserved Instances or Savings Plans.",
+      "output": {
+        "current_spend": {
+          "total_monthly": "$45,000",
+          "breakdown": {
+            "EC2": "$18,000 (40%)",
+            "RDS": "$8,000 (18%)",
+            "Data Transfer": "$6,000 (13%)",
+            "ECS/Fargate": "$5,000 (11%)",
+            "S3": "$4,000 (9%)",
+            "Other": "$4,000 (9%)"
+          }
+        },
+        "total_identified_savings": {
+          "monthly": "$12,800 - $17,200",
+          "annual": "$153,600 - $206,400",
+          "percentage": "28% - 38%"
+        },
+        "quick_wins": [
+          {
+            "action": "Purchase Compute Savings Plan (1-year, no upfront) for baseline EC2+Fargate usage",
+            "monthly_savings": "$5,500 - $7,000",
+            "risk": "LOW",
+            "implementation": "Analyze last 30 days of compute usage in Cost Explorer → Savings Plans recommendations. Cover 70-80% of baseline with 1-year no-upfront plan. This alone saves 24-30% on compute."
+          },
+          {
+            "action": "Delete unused EBS volumes and old snapshots",
+            "monthly_savings": "$200 - $600",
+            "risk": "LOW",
+            "implementation": "aws ec2 describe-volumes --filters Name=status,Values=available | List and review each. Delete volumes unused for >30 days."
+          },
+          {
+            "action": "Shut down staging environment outside business hours (7pm-7am + weekends)",
+            "monthly_savings": "$2,000 - $3,000",
+            "risk": "LOW",
+            "implementation": "Use AWS Instance Scheduler or a simple Lambda + EventBridge rule to stop/start staging EC2, RDS, and ECS services. Saves ~65% of staging compute costs."
+          }
+        ],
+        "medium_effort": [
+          {
+            "action": "Right-size EC2 instances based on actual CPU/memory utilization",
+            "monthly_savings": "$2,000 - $3,600",
+            "risk": "MEDIUM",
+            "implementation": "Enable AWS Compute Optimizer. Review recommendations for each instance. Typical finding: teams use m5.xlarge when m5.large would suffice. Test in staging first."
+          },
+          {
+            "action": "Implement S3 Intelligent-Tiering and lifecycle policies",
+            "monthly_savings": "$1,200 - $1,600",
+            "risk": "LOW",
+            "implementation": "Enable S3 Intelligent-Tiering for all buckets. Add lifecycle rules: transition to IA after 30 days, Glacier after 90 days for logs and backups. Expected 60-70% reduction in S3 costs."
+          }
+        ],
+        "strategic_initiatives": [
+          {
+            "action": "Optimize data transfer architecture with VPC endpoints and CloudFront",
+            "monthly_savings": "$1,900 - $3,400",
+            "risk": "MEDIUM",
+            "implementation": "1. Add VPC endpoints for S3 and DynamoDB (free, eliminates NAT Gateway data processing fees). 2. Put CloudFront in front of API for cacheable responses. 3. Review cross-AZ traffic patterns."
+          }
+        ]
+      }
+    },
+    {
+      "input": "We're running 15 GPU instances (p3.2xlarge) on AWS for ML training jobs. They run 24/7 but actual training only happens about 40 hours per week. Monthly GPU cost is around $70,000.",
+      "output": {
+        "current_spend": {
+          "total_monthly": "$70,000",
+          "utilization": "24% (40 hours actual use out of 168 hours/week)",
+          "waste": "76% of GPU spend is idle time"
+        },
+        "total_identified_savings": {
+          "monthly": "$45,000 - $55,000",
+          "annual": "$540,000 - $660,000",
+          "percentage": "64% - 79%"
+        },
+        "quick_wins": [
+          {
+            "action": "Stop GPU instances when not training (implement on-demand scheduling)",
+            "monthly_savings": "$38,000 - $45,000",
+            "risk": "LOW",
+            "implementation": "Use AWS Step Functions or a simple scheduler to start instances when training jobs are queued and stop them when complete. With 40hr/week usage, you only pay for 24% of the current cost. Even with 15 minutes of startup overhead per job, savings are massive."
+          },
+          {
+            "action": "Use Spot Instances for fault-tolerant training jobs",
+            "monthly_savings": "$7,000 - $10,000",
+            "risk": "MEDIUM",
+            "implementation": "p3.2xlarge spot pricing is typically 60-70% off on-demand. Implement checkpointing every 30 minutes so interrupted training can resume. Use spot fleet with diversified instance types (p3.2xlarge, g5.2xlarge) for better availability."
+          }
+        ]
+      }
+    },
+    {
+      "input": "Can you review our GCP project spending? We use GKE, Cloud SQL, BigQuery, Cloud Storage, and Pub/Sub. Monthly bill is $22,000 and growing 15% month over month. We're a Series A startup with 50,000 users.",
+      "output": {
+        "current_spend": {
+          "total_monthly": "$22,000",
+          "growth_rate": "15% MoM",
+          "projected_12_month": "$22,000 → ~$82,000/month if growth continues",
+          "unit_economics": "$0.44 per user per month"
+        },
+        "analysis_approach": "At 15% MoM growth, aggressive cost cutting is less important than unit economics optimization. Focus on ensuring cost scales sub-linearly with users — cost per user should decrease, not increase.",
+        "quick_wins": [
+          {
+            "action": "Enable GKE cluster autoscaler and right-size node pools",
+            "monthly_savings": "$2,500 - $4,000",
+            "risk": "LOW",
+            "implementation": "1. Enable cluster autoscaler with min 2, max 10 nodes. 2. Switch to e2 machine types (20% cheaper than n1). 3. Use node auto-provisioning to match workload shapes. 4. Set resource requests/limits on all pods to enable efficient bin-packing."
+          },
+          {
+            "action": "Optimize BigQuery with partitioning and query cost controls",
+            "monthly_savings": "$800 - $1,500",
+            "risk": "LOW",
+            "implementation": "1. Partition tables by date. 2. Require partition filters on large tables. 3. Set per-user query cost quotas. 4. Convert frequently-run queries to materialized views. 5. Consider switching heavy analytics tables to BigQuery BI Engine."
+          }
+        ],
+        "strategic_note": "At Series A with 50K users growing 15% MoM, your priority should be: (1) track cost-per-user trend monthly, (2) ensure committed use discounts cover baseline, (3) optimize the highest-growth cost categories. Don't over-invest engineering time in saving $200/month — focus on the items that will matter at 500K users."
+      }
+    }
+  ]
+}

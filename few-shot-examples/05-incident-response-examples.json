@@ -1,0 +1,176 @@
+{
+  "prompt_name": "Incident Response Commander",
+  "examples": [
+    {
+      "input": "Our API is returning 502 errors. About 30% of requests are failing. We're getting flooded with customer complaints on Twitter. The API is behind an AWS ALB -> ECS Fargate setup. No recent deploys.",
+      "output": {
+        "incident_assessment": {
+          "severity": "SEV2",
+          "justification": "Significant user impact (30% error rate), public visibility (Twitter complaints), but service is degraded not fully down.",
+          "impact": {
+            "users_affected": "~30% of all API consumers",
+            "revenue_impact": "Direct — 30% of transactions failing",
+            "data_integrity": "No data loss risk (read/write failures, not corruption)",
+            "duration": "Unknown — need to establish start time from metrics"
+          }
+        },
+        "immediate_actions": [
+          {
+            "step": 1,
+            "action": "Establish the blast radius",
+            "commands": [
+              "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name HTTPCode_ELB_502_Count --dimensions Name=LoadBalancer,Value=<alb-id> --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S) --end-time $(date -u +%Y-%m-%dT%H:%M:%S) --period 60 --statistics Sum",
+              "aws ecs describe-services --cluster <cluster> --services <service> --query 'services[0].{desired:desiredCount,running:runningCount,pending:pendingCount}'"
+            ]
+          },
+          {
+            "step": 2,
+            "action": "Check ECS task health — 502s from ALB usually mean targets are unhealthy or unresponsive",
+            "commands": [
+              "aws elbv2 describe-target-health --target-group-arn <tg-arn>",
+              "aws ecs list-tasks --cluster <cluster> --service-name <service> --desired-status RUNNING",
+              "aws logs filter-log-events --log-group-name /ecs/<service> --start-time $(date -u -d '30 minutes ago' +%s)000 --filter-pattern 'ERROR' --limit 50"
+            ]
+          },
+          {
+            "step": 3,
+            "action": "If tasks are being killed/restarted, check for OOM or health check failures",
+            "commands": [
+              "aws ecs describe-tasks --cluster <cluster> --tasks <task-ids> --query 'tasks[].{status:lastStatus,reason:stoppedReason,health:healthStatus}'",
+              "aws ecs describe-services --cluster <cluster> --services <service> --query 'services[0].events[:10]'"
+            ]
+          },
+          {
+            "step": 4,
+            "action": "If tasks are healthy but 502s persist, check ALB idle timeout vs app response time",
+            "note": "Common cause: app response time exceeds ALB idle timeout (default 60s). ALB sends 502 when the target closes the connection before responding."
+          }
+        ],
+        "hypotheses": [
+          {
+            "hypothesis": "ECS tasks running out of memory (OOMKill) → ALB loses healthy targets → 502s",
+            "status": "INVESTIGATING",
+            "evidence": "30% error rate aligns with losing 1 of 3 tasks in a target group"
+          },
+          {
+            "hypothesis": "Downstream dependency (database, cache) slow → app response time exceeds ALB timeout → 502s",
+            "status": "INVESTIGATING",
+            "evidence": "No deploys rules out code change. Gradual onset suggests resource exhaustion."
+          },
+          {
+            "hypothesis": "ALB target group health check misconfiguration → healthy tasks marked unhealthy",
+            "status": "INVESTIGATING",
+            "evidence": "Possible if health check path has a bug or dependency that's failing"
+          }
+        ],
+        "communication_template": {
+          "internal_slack": "🔴 **SEV2 — API 502 Errors**\n**Impact**: ~30% of API requests returning 502\n**Started**: [TIME from metrics]\n**IC**: [Your name]\n**Status**: Investigating. ALB returning 502s, checking ECS task health and downstream deps.\n**Next update**: 15 minutes\n**Thread**: replies in this thread only",
+          "customer_status_page": "We are currently investigating elevated error rates on our API. Some requests may fail with timeout or server errors. Our team is actively working on resolution. We will provide updates every 15 minutes."
+        }
+      }
+    },
+    {
+      "input": "Database CPU is at 98% and climbing. Queries are timing out. It's our primary PostgreSQL RDS instance (db.r5.2xlarge). This powers our main product. It was fine yesterday.",
+      "output": {
+        "incident_assessment": {
+          "severity": "SEV1",
+          "justification": "Primary database at capacity ceiling — imminent risk of full outage. All product functionality dependent on this database.",
+          "impact": {
+            "users_affected": "All users experiencing degraded performance, approaching full outage",
+            "revenue_impact": "HIGH — core product functionality at risk",
+            "data_integrity": "LOW risk if we act before connection pool exhaustion. HIGH risk if forced restart without clean shutdown.",
+            "duration": "Developing — CPU trend suggests full saturation within minutes"
+          }
+        },
+        "immediate_actions": [
+          {
+            "step": 1,
+            "action": "IMMEDIATELY identify and kill the runaway queries",
+            "commands": [
+              "SELECT pid, now() - pg_stat_activity.query_start AS duration, query, state FROM pg_stat_activity WHERE (now() - pg_stat_activity.query_start) > interval '30 seconds' AND state != 'idle' ORDER BY duration DESC;",
+              "SELECT pg_cancel_backend(<pid>); -- for queries that can be safely cancelled",
+              "SELECT pg_terminate_backend(<pid>); -- nuclear option if cancel doesn't work"
+            ]
+          },
+          {
+            "step": 2,
+            "action": "Check for table locks and blocked queries",
+            "commands": [
+              "SELECT blocked_locks.pid AS blocked_pid, blocking_locks.pid AS blocking_pid, blocked_activity.query AS blocked_query FROM pg_catalog.pg_locks blocked_locks JOIN pg_catalog.pg_locks blocking_locks ON blocking_locks.locktype = blocked_locks.locktype JOIN pg_catalog.pg_stat_activity blocked_activity ON blocked_activity.pid = blocked_locks.pid WHERE NOT blocked_locks.granted;"
+            ]
+          },
+          {
+            "step": 3,
+            "action": "If CPU doesn't drop after killing queries, scale up the instance",
+            "commands": [
+              "aws rds modify-db-instance --db-instance-identifier <id> --db-instance-class db.r5.4xlarge --apply-immediately",
+              "# WARNING: This causes a brief outage (60-90 seconds) during instance class change"
+            ],
+            "note": "Only do this if killing queries doesn't resolve. Scaling up buys time but doesn't fix the root cause."
+          }
+        ],
+        "investigation_after_mitigation": "Once CPU is stable: 1) Check pg_stat_statements for the query that caused the spike. 2) Look for missing indexes on the problematic query. 3) Check if a batch job or migration ran that doesn't normally run. 4) Review connection count trends — connection storms can cause CPU spikes."
+      }
+    },
+    {
+      "input": "We just noticed that one of our S3 buckets with customer PII data has been publicly accessible. We don't know for how long. What do we do?",
+      "output": {
+        "incident_assessment": {
+          "severity": "SEV1 — SECURITY INCIDENT",
+          "justification": "Potential data breach involving customer PII. Regulatory and legal implications. This is not just an operations incident — it requires security and legal coordination.",
+          "impact": {
+            "users_affected": "Unknown — need to determine what data was in the bucket and whether it was accessed",
+            "revenue_impact": "Potential regulatory fines (GDPR: up to 4% of annual revenue, CCPA: $7,500 per intentional violation)",
+            "data_integrity": "PII exposure risk — customer data potentially accessed by unauthorized parties",
+            "duration": "Unknown — must determine when the bucket became public via CloudTrail"
+          }
+        },
+        "immediate_actions": [
+          {
+            "step": 1,
+            "priority": "DO THIS NOW — close the exposure",
+            "commands": [
+              "aws s3api put-public-access-block --bucket <bucket-name> --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true",
+              "aws s3api delete-bucket-policy --bucket <bucket-name>",
+              "# Verify it's locked down:",
+              "aws s3api get-bucket-policy-status --bucket <bucket-name>"
+            ]
+          },
+          {
+            "step": 2,
+            "priority": "Preserve forensic evidence — DO NOT delete logs",
+            "commands": [
+              "# Check S3 server access logs (if enabled):",
+              "aws s3 ls s3://<logging-bucket>/s3-access-logs/<bucket-name>/",
+              "# Check CloudTrail for bucket policy changes:",
+              "aws cloudtrail lookup-events --lookup-attributes AttributeKey=ResourceName,AttributeValue=<bucket-name> --start-time 2024-01-01 --max-results 50"
+            ]
+          },
+          {
+            "step": 3,
+            "priority": "Determine the scope of exposure",
+            "actions": [
+              "Identify exactly what PII was in the bucket (names, emails, SSNs, financial data?)",
+              "Use CloudTrail to find when the bucket policy was changed to allow public access",
+              "Analyze S3 access logs for any external IP addresses that accessed the data",
+              "Count the number of unique records potentially exposed"
+            ]
+          },
+          {
+            "step": 4,
+            "priority": "Escalate to security and legal teams",
+            "actions": [
+              "Notify your CISO or security lead immediately",
+              "Engage legal counsel — potential breach notification requirements under GDPR (72 hours), state laws, HIPAA",
+              "Do NOT make public statements until legal has reviewed",
+              "Begin preparing breach notification documentation"
+            ]
+          }
+        ],
+        "communication_template": {
+          "internal_security_channel": "🔴 **SECURITY INCIDENT — S3 Data Exposure**\n**Severity**: SEV1\n**What**: S3 bucket containing customer PII was publicly accessible\n**Status**: Bucket has been locked down. Forensic investigation in progress.\n**IC**: [Name]\n**Security Lead**: [Name] — NOTIFIED\n**Legal**: [Name] — NOTIFIED\n**Action needed**: NO external communications until legal review. Preserve all logs.\n**Next update**: 30 minutes"
+        }
+      }
+    }
+  ]
+}

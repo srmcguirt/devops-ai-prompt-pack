@@ -1,0 +1,160 @@
+{
+  "prompt_name": "Monitoring & Observability Architect",
+  "examples": [
+    {
+      "input": "Design a monitoring stack for a microservices application with 12 services running on Kubernetes. We're a team of 8 engineers, budget-conscious (startup), and currently have no monitoring beyond kubectl logs. We need metrics, alerts, and dashboards.",
+      "output": {
+        "stack_selection": {
+          "metrics": "Prometheus (free, Kubernetes-native, widely supported)",
+          "dashboards": "Grafana (free tier sufficient for team of 8)",
+          "logging": "Loki (Grafana ecosystem, cheaper than ELK for startup scale)",
+          "alerting": "Alertmanager → PagerDuty free tier (up to 5 users) or Slack",
+          "tracing": "Jaeger (defer to Phase 2 — get metrics and alerts first)",
+          "justification": "All open-source, Helm-installable, proven at startup scale. Estimated cost: $0 software + $200-400/month infrastructure (3 monitoring nodes in K8s)"
+        },
+        "slos": [
+          {
+            "service": "API Gateway",
+            "sli": "Successful HTTP responses (non-5xx) / total requests",
+            "target": "99.9%",
+            "error_budget_30d": "43.2 minutes of downtime",
+            "alert": "Alert when 1-hour burn rate consumes >2% of monthly budget"
+          },
+          {
+            "service": "Payment Service",
+            "sli": "Payment processing latency p99 < 2 seconds",
+            "target": "99.95%",
+            "error_budget_30d": "21.6 minutes",
+            "alert": "Alert when 5-minute burn rate consumes >1% of monthly budget"
+          },
+          {
+            "service": "All Services",
+            "sli": "Request success rate",
+            "target": "99.5%",
+            "error_budget_30d": "3.6 hours",
+            "alert": "Alert when any service drops below 99% success rate for 5 minutes"
+          }
+        ],
+        "alerts": [
+          {
+            "name": "HighErrorRate",
+            "condition": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) by (service) / sum(rate(http_requests_total[5m])) by (service) > 0.01",
+            "severity": "P2",
+            "response": "Check service logs, recent deploys, downstream dependencies",
+            "runbook": "runbooks/high-error-rate.md"
+          },
+          {
+            "name": "PodCrashLooping",
+            "condition": "increase(kube_pod_container_status_restarts_total[1h]) > 3",
+            "severity": "P2",
+            "response": "Check pod logs (--previous), resource limits, image pull status",
+            "runbook": "runbooks/crashloop.md"
+          },
+          {
+            "name": "HighLatencyP99",
+            "condition": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)) > 2",
+            "severity": "P3",
+            "response": "Check database query performance, cache hit rates, downstream service latency",
+            "runbook": "runbooks/high-latency.md"
+          },
+          {
+            "name": "NodeDiskPressure",
+            "condition": "kube_node_status_condition{condition=\"DiskPressure\", status=\"true\"} == 1",
+            "severity": "P2",
+            "response": "Clear old container images, check log volume, expand disk",
+            "runbook": "runbooks/disk-pressure.md"
+          },
+          {
+            "name": "PersistentVolumeAlmostFull",
+            "condition": "kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.85",
+            "severity": "P3",
+            "response": "Expand PVC or clean up old data",
+            "runbook": "runbooks/pv-full.md"
+          }
+        ],
+        "implementation_steps": [
+          "1. Install kube-prometheus-stack via Helm (Prometheus + Grafana + Alertmanager + node-exporter + kube-state-metrics in one chart)",
+          "2. Install Loki + Promtail via Helm for log aggregation",
+          "3. Add Prometheus client libraries to each service (expose /metrics endpoint)",
+          "4. Import Grafana dashboard templates: K8s cluster overview (3119), K8s pod resources (6417), Node Exporter (1860)",
+          "5. Configure Alertmanager to route P1/P2 to PagerDuty, P3/P4 to Slack #alerts channel",
+          "6. Create service-specific dashboards with the four golden signals",
+          "7. Set up Grafana alerts for SLO burn rate (or use Sloth for SLO-based alerting)"
+        ]
+      }
+    },
+    {
+      "input": "Our team is drowning in alerts. We get 50-100 alerts per day and most are noise. Engineers have started ignoring PagerDuty. Help us fix our alerting strategy.",
+      "output": {
+        "diagnosis": "Alert fatigue is an organizational and technical crisis. When engineers ignore alerts, real incidents get missed. The fix requires both reducing noise AND rebuilding trust in the alerting system.",
+        "immediate_triage": {
+          "step_1": "Export all current alerts with their firing frequency over the last 30 days",
+          "step_2": "Categorize each alert into: ACTIONABLE (someone did something), NOISE (auto-resolved, no action taken), DUPLICATE (same root cause as another alert), INFORMATIONAL (useful to know but not page-worthy)",
+          "step_3": "Expected result: 60-80% of alerts fall into NOISE or DUPLICATE categories"
+        },
+        "alert_rules": [
+          {
+            "rule": "Every alert must have a documented response action",
+            "rationale": "If no one knows what to do when it fires, it shouldn't be an alert. Convert to a dashboard panel or log query instead."
+          },
+          {
+            "rule": "Alert on symptoms (user impact), not causes (high CPU)",
+            "rationale": "High CPU with normal latency and error rates = no user impact = no page. Alert when error rate exceeds SLO, not when a metric looks high."
+          },
+          {
+            "rule": "Minimum 5-minute evaluation window for non-critical alerts",
+            "rationale": "Transient spikes that self-resolve in 2 minutes shouldn't page anyone. Use `for: 5m` in Prometheus alerting rules."
+          },
+          {
+            "rule": "Group related alerts — one notification per incident, not per symptom",
+            "rationale": "When a database goes down, 15 downstream services will alert. Use Alertmanager group_by and inhibition rules to send ONE alert for the root cause."
+          },
+          {
+            "rule": "Alerts have exactly 3 severities: PAGE (wake someone up), NOTIFY (Slack during business hours), LOG (record for trends)",
+            "rationale": "5-tier severity systems (P1-P5) create confusion. Simplify to: is this worth waking someone up? Yes = PAGE. No = NOTIFY or LOG."
+          }
+        ],
+        "alertmanager_config": "route:\n  receiver: 'slack-notifications'\n  group_by: ['alertname', 'cluster', 'service']\n  group_wait: 30s\n  group_interval: 5m\n  repeat_interval: 4h\n  routes:\n    - match:\n        severity: page\n      receiver: 'pagerduty-critical'\n      continue: true\n    - match:\n        severity: notify\n      receiver: 'slack-alerts'\n      group_wait: 1m\n      repeat_interval: 12h\n\ninhibit_rules:\n  # If a node is down, suppress all pod alerts on that node\n  - source_match:\n      alertname: NodeDown\n    target_match_re:\n      alertname: Pod.*\n    equal: ['node']\n  # If a database is down, suppress downstream service alerts\n  - source_match:\n      alertname: DatabaseDown\n    target_match_re:\n      alertname: HighErrorRate|HighLatency\n    equal: ['cluster']",
+        "success_metrics": [
+          "Target: < 5 actionable pages per on-call shift (1 week)",
+          "Track: percentage of alerts that result in human action (target > 80%)",
+          "Review: monthly alert quality audit — delete alerts no one acted on",
+          "Result: on-call engineers trust the pager again within 4-6 weeks"
+        ]
+      }
+    },
+    {
+      "input": "Set up structured logging with correlation IDs for a Node.js Express application. Logs need to work with both local development (human-readable) and production (JSON for Loki/ELK).",
+      "output": {
+        "log_schema": {
+          "standard_fields": {
+            "timestamp": "ISO 8601 format",
+            "level": "error | warn | info | debug",
+            "message": "Human-readable log message",
+            "service": "Service name from environment variable",
+            "requestId": "UUID correlation ID from X-Request-ID header or generated",
+            "userId": "Authenticated user ID (if available)",
+            "traceId": "OpenTelemetry trace ID (if tracing enabled)",
+            "duration": "Request duration in milliseconds (for request logs)",
+            "method": "HTTP method",
+            "path": "Request path (without query params to avoid PII in logs)",
+            "statusCode": "HTTP response status code",
+            "error": "Error object with name, message, stack (only for error logs)"
+          }
+        },
+        "implementation": {
+          "logger_setup": "import pino from 'pino';\n\nconst logger = pino({\n  level: process.env.LOG_LEVEL || 'info',\n  transport: process.env.NODE_ENV !== 'production'\n    ? { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:standard' } }\n    : undefined,\n  base: { service: process.env.SERVICE_NAME || 'api' },\n  serializers: {\n    err: pino.stdSerializers.err,\n    req: (req) => ({\n      method: req.method,\n      url: req.url,\n      remoteAddress: req.remoteAddress,\n    }),\n  },\n  redact: ['req.headers.authorization', 'req.headers.cookie', '*.password', '*.token'],\n});",
+          "middleware": "import { randomUUID } from 'crypto';\nimport { pinoHttp } from 'pino-http';\n\napp.use(pinoHttp({\n  logger,\n  genReqId: (req) => req.headers['x-request-id'] || randomUUID(),\n  customLogLevel: (req, res, err) => {\n    if (res.statusCode >= 500 || err) return 'error';\n    if (res.statusCode >= 400) return 'warn';\n    return 'info';\n  },\n  customSuccessMessage: (req, res) =>\n    `${req.method} ${req.url} ${res.statusCode} ${Date.now() - req.startTime}ms`,\n}));",
+          "usage_example": "// In route handlers — logger is attached to req\napp.get('/users/:id', async (req, res) => {\n  req.log.info({ userId: req.params.id }, 'Fetching user');\n  try {\n    const user = await db.users.findById(req.params.id);\n    req.log.info({ userId: user.id }, 'User found');\n    res.json(user);\n  } catch (err) {\n    req.log.error({ err, userId: req.params.id }, 'Failed to fetch user');\n    res.status(500).json({ error: 'Internal server error' });\n  }\n});"
+        },
+        "local_output": "INFO [2024-01-15 10:23:45] Fetching user — userId=usr_123 requestId=abc-def-ghi\nINFO [2024-01-15 10:23:45] User found — userId=usr_123 requestId=abc-def-ghi\nINFO [2024-01-15 10:23:45] GET /users/usr_123 200 23ms — requestId=abc-def-ghi",
+        "production_output": "{\"level\":30,\"time\":1705312025000,\"service\":\"api\",\"requestId\":\"abc-def-ghi\",\"userId\":\"usr_123\",\"msg\":\"User found\"}",
+        "loki_query_examples": [
+          "{service=\"api\"} |= \"error\" | json | requestId != \"\" — find all errors with correlation IDs",
+          "{service=\"api\"} | json | requestId=\"abc-def-ghi\" — trace a single request across all log lines",
+          "sum(rate({service=\"api\"} | json | level=\"error\" [5m])) — error rate for alerting"
+        ]
+      }
+    }
+  ]
+}

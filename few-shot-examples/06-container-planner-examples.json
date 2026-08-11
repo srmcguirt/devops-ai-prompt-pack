@@ -1,0 +1,54 @@
+{
+  "prompt_name": "Container Architecture Planner",
+  "examples": [
+    {
+      "input": "Containerize a Django application with Celery workers, Redis for caching/message broker, and PostgreSQL. The app serves both a REST API and a React frontend (built with Vite). Needs to work for local development and production on ECS.",
+      "output": {
+        "service_map": [
+          {"name": "web", "role": "Django app serving REST API + static React build", "ports": "8000", "replicas": "2-10 (auto-scaled)"},
+          {"name": "worker", "role": "Celery worker processing background tasks", "ports": "none", "replicas": "1-5 (queue-depth scaled)"},
+          {"name": "beat", "role": "Celery Beat scheduler for periodic tasks", "ports": "none", "replicas": "1 (singleton)"},
+          {"name": "redis", "role": "Cache + Celery message broker", "ports": "6379", "replicas": "1 (use ElastiCache in prod)"},
+          {"name": "postgres", "role": "Primary database", "ports": "5432", "replicas": "1 (use RDS in prod)"}
+        ],
+        "dockerfile": "# ---- Build Stage: Frontend ----\nFROM node:20-alpine AS frontend-builder\nWORKDIR /app/frontend\nCOPY frontend/package.json frontend/pnpm-lock.yaml ./\nRUN corepack enable && pnpm install --frozen-lockfile\nCOPY frontend/ ./\nRUN pnpm build\n\n# ---- Build Stage: Python Dependencies ----\nFROM python:3.12-slim AS python-builder\nWORKDIR /app\nRUN apt-get update && apt-get install -y --no-install-recommends \\\n    build-essential libpq-dev && rm -rf /var/lib/apt/lists/*\nCOPY requirements/production.txt requirements.txt\nRUN pip install --no-cache-dir --prefix=/install -r requirements.txt\n\n# ---- Production Stage ----\nFROM python:3.12-slim AS production\nWORKDIR /app\n\n# Install only runtime dependencies\nRUN apt-get update && apt-get install -y --no-install-recommends \\\n    libpq5 curl && rm -rf /var/lib/apt/lists/*\n\n# Copy Python dependencies from builder\nCOPY --from=python-builder /install /usr/local\n\n# Copy built frontend assets\nCOPY --from=frontend-builder /app/frontend/dist /app/static/frontend\n\n# Copy application code\nCOPY . /app/\n\n# Create non-root user\nRUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser\nRUN chown -R appuser:appuser /app\nUSER appuser\n\n# Collect static files\nRUN python manage.py collectstatic --noinput\n\nHEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\\n  CMD curl -f http://localhost:8000/health/ || exit 1\n\nEXPOSE 8000\nCMD [\"gunicorn\", \"config.wsgi:application\", \"--bind\", \"0.0.0.0:8000\", \"--workers\", \"4\", \"--threads\", \"2\"]",
+        "docker_compose_dev": "version: '3.8'\n\nservices:\n  web:\n    build:\n      context: .\n      target: production\n    ports:\n      - '8000:8000'\n    volumes:\n      - .:/app\n      - /app/static/frontend  # Don't override built frontend in dev\n    environment:\n      - DEBUG=1\n      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/appdb\n      - REDIS_URL=redis://redis:6379/0\n      - CELERY_BROKER_URL=redis://redis:6379/1\n    depends_on:\n      postgres:\n        condition: service_healthy\n      redis:\n        condition: service_healthy\n    command: python manage.py runserver 0.0.0.0:8000\n\n  worker:\n    build:\n      context: .\n      target: production\n    volumes:\n      - .:/app\n    environment:\n      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/appdb\n      - REDIS_URL=redis://redis:6379/0\n      - CELERY_BROKER_URL=redis://redis:6379/1\n    depends_on:\n      - redis\n      - postgres\n    command: celery -A config worker -l info --concurrency=2\n\n  beat:\n    build:\n      context: .\n      target: production\n    volumes:\n      - .:/app\n    environment:\n      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/appdb\n      - CELERY_BROKER_URL=redis://redis:6379/1\n    depends_on:\n      - redis\n    command: celery -A config beat -l info\n\n  frontend:\n    image: node:20-alpine\n    working_dir: /app/frontend\n    volumes:\n      - ./frontend:/app/frontend\n    ports:\n      - '5173:5173'\n    command: sh -c 'corepack enable && pnpm install && pnpm dev --host'\n\n  postgres:\n    image: postgres:16-alpine\n    environment:\n      POSTGRES_DB: appdb\n      POSTGRES_PASSWORD: postgres\n    volumes:\n      - postgres_data:/var/lib/postgresql/data\n    ports:\n      - '5432:5432'\n    healthcheck:\n      test: ['CMD-SHELL', 'pg_isready -U postgres']\n      interval: 5s\n      timeout: 5s\n      retries: 5\n\n  redis:\n    image: redis:7-alpine\n    ports:\n      - '6379:6379'\n    healthcheck:\n      test: ['CMD', 'redis-cli', 'ping']\n      interval: 5s\n      timeout: 5s\n      retries: 5\n\nvolumes:\n  postgres_data:",
+        "image_sizes": {
+          "builder_frontend": "~350 MB (node + deps, discarded)",
+          "builder_python": "~800 MB (build tools + deps, discarded)",
+          "production": "~180 MB (slim Python + runtime deps + app code + built frontend)"
+        }
+      }
+    },
+    {
+      "input": "We have a legacy Java Spring Boot monolith (Java 11, Maven, ~500K LOC) that we need to containerize. It currently runs on bare metal with 32GB RAM. It connects to Oracle DB, uses local filesystem for file uploads, and has scheduled jobs via Spring @Scheduled.",
+      "output": {
+        "architecture_summary": "Containerize the monolith as-is first (lift-and-shift), then incrementally improve. Replace local filesystem with S3-compatible storage, externalize Spring @Scheduled jobs to a separate container to enable horizontal scaling of the web tier.",
+        "migration_strategy": "Phase 1: Containerize monolith with minimal changes (2-3 days). Phase 2: Externalize file storage to S3 (1 week). Phase 3: Split scheduled jobs into a separate service (1 week). Phase 4: Move to Kubernetes with proper health checks and graceful shutdown.",
+        "dockerfile": "# ---- Build Stage ----\nFROM maven:3.9-eclipse-temurin-11 AS builder\nWORKDIR /app\n\n# Cache Maven dependencies (copy pom.xml first)\nCOPY pom.xml .\nCOPY .mvn .mvn\nRUN mvn dependency:go-offline -B\n\n# Build the application\nCOPY src ./src\nRUN mvn package -DskipTests -B\n\n# ---- Production Stage ----\nFROM eclipse-temurin:11-jre-jammy AS production\nWORKDIR /app\n\n# Create non-root user\nRUN groupadd -r appuser && useradd -r -g appuser appuser\n\n# Copy the built JAR\nCOPY --from=builder /app/target/*.jar app.jar\n\n# JVM tuning for containers — respect cgroup memory limits\nENV JAVA_OPTS=\"-XX:+UseContainerSupport \\\n    -XX:MaxRAMPercentage=75.0 \\\n    -XX:InitialRAMPercentage=50.0 \\\n    -XX:+UseG1GC \\\n    -XX:+HeapDumpOnOutOfMemoryError \\\n    -XX:HeapDumpPath=/tmp/heapdump.hprof \\\n    -Djava.security.egd=file:/dev/./urandom\"\n\n# Volume for file uploads (Phase 1 — move to S3 in Phase 2)\nVOLUME /app/uploads\n\nUSER appuser\n\nHEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \\\n  CMD curl -f http://localhost:8080/actuator/health || exit 1\n\nEXPOSE 8080\nENTRYPOINT [\"sh\", \"-c\", \"java $JAVA_OPTS -jar app.jar\"]\n",
+        "key_considerations": [
+          "JVM memory: Use -XX:MaxRAMPercentage=75.0 instead of fixed -Xmx. This respects container memory limits and leaves 25% for off-heap, JVM overhead, and OS.",
+          "Oracle JDBC: The Oracle JDBC driver requires accepting a license. Use ojdbc11 from Maven Central or include it in the build stage.",
+          "File uploads: Phase 1 uses a Docker volume. This breaks horizontal scaling. Phase 2 must migrate to S3/MinIO.",
+          "Scheduled jobs: @Scheduled annotations run on every container instance. In Phase 3, use ShedLock or extract to a dedicated scheduler container with replicas=1.",
+          "Startup time: Spring Boot apps this size may take 60-120 seconds to start. Set health check start-period accordingly and use startupProbe in Kubernetes."
+        ]
+      }
+    },
+    {
+      "input": "Create a minimal, secure Dockerfile for a Go microservice that serves an HTTP API. Binary is statically compiled. No external dependencies at runtime.",
+      "output": {
+        "dockerfile": "# ---- Build Stage ----\nFROM golang:1.22-alpine AS builder\nWORKDIR /app\n\n# Cache Go module downloads\nCOPY go.mod go.sum ./\nRUN go mod download && go mod verify\n\n# Build static binary with security flags\nCOPY . .\nRUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \\\n    -ldflags='-w -s -extldflags \"-static\"' \\\n    -trimpath \\\n    -o /app/server ./cmd/server\n\n# ---- Production Stage ----\nFROM gcr.io/distroless/static-debian12:nonroot\n\nCOPY --from=builder /app/server /server\n\nEXPOSE 8080\nENTRYPOINT [\"/server\"]\n",
+        "image_size": "~8 MB (distroless static + Go binary)",
+        "security_notes": [
+          "distroless/static has no shell, no package manager, no libc — minimal attack surface",
+          "Running as 'nonroot' user (UID 65534) by default",
+          "-w -s strips debug info and symbol table from binary",
+          "-trimpath removes local file system paths from binary",
+          "CGO_ENABLED=0 ensures fully static binary — no glibc dependency",
+          "No HEALTHCHECK in Dockerfile — use Kubernetes livenessProbe/readinessProbe instead for container orchestration environments"
+        ]
+      }
+    }
+  ]
+}

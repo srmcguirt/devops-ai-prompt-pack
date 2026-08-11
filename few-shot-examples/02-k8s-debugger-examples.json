@@ -1,0 +1,132 @@
+{
+  "prompt_name": "Kubernetes Debugger",
+  "examples": [
+    {
+      "input": "My pods are stuck in CrashLoopBackOff. The app container starts, runs for about 10 seconds, then crashes. It's a Node.js app deployed with a Helm chart. Namespace is 'production'. We deployed a new version about 30 minutes ago.",
+      "output": {
+        "diagnosis": {
+          "symptoms_observed": [
+            "Pods in CrashLoopBackOff state",
+            "Container runs for ~10 seconds before crashing",
+            "Recent deployment (~30 minutes ago)",
+            "Node.js application"
+          ],
+          "most_likely_root_cause": {
+            "description": "Application crash during startup — likely a runtime error (missing environment variable, failed database connection, or unhandled exception during initialization) introduced in the latest deployment.",
+            "confidence": "HIGH"
+          },
+          "verification_commands": [
+            "kubectl logs -n production <pod-name> --previous -f",
+            "kubectl describe pod -n production <pod-name> | grep -A 20 'Last State'",
+            "kubectl get events -n production --sort-by=.metadata.creationTimestamp | tail -20",
+            "kubectl get deployment -n production <deployment-name> -o jsonpath='{.spec.template.spec.containers[0].image}'",
+            "kubectl rollout history deployment/<deployment-name> -n production"
+          ],
+          "alternative_causes": [
+            {
+              "cause": "OOMKilled — container exceeding memory limits",
+              "probability": "MEDIUM",
+              "check": "kubectl describe pod -n production <pod-name> | grep OOMKilled"
+            },
+            {
+              "cause": "Failing health check — readiness/liveness probe timing out on slow startup",
+              "probability": "MEDIUM",
+              "check": "kubectl get pod -n production <pod-name> -o jsonpath='{.spec.containers[0].livenessProbe}'"
+            },
+            {
+              "cause": "Missing ConfigMap or Secret that was removed or renamed",
+              "probability": "LOW",
+              "check": "kubectl get events -n production | grep -i 'failed\\|missing\\|not found'"
+            }
+          ]
+        },
+        "remediation": {
+          "immediate_fix": [
+            "1. Check the crash logs: kubectl logs -n production deployment/<name> --previous",
+            "2. If it's a code bug in the new version, rollback immediately: kubectl rollout undo deployment/<name> -n production",
+            "3. Verify rollback succeeded: kubectl rollout status deployment/<name> -n production",
+            "4. Confirm pods are running: kubectl get pods -n production -l app=<name>"
+          ],
+          "permanent_fix": "After rollback stabilizes production, debug the new version in staging. Common Node.js CrashLoopBackOff causes: 1) unhandled promise rejection crashing the process, 2) missing DATABASE_URL or API_KEY env var, 3) incorrect startup command in Dockerfile CMD. Fix the root cause and redeploy through the normal CI/CD pipeline."
+        },
+        "prevention": {
+          "monitoring": "Add Prometheus alert: kube_pod_container_status_restarts_total increase > 3 in 5 minutes",
+          "best_practices": [
+            "Add startup probes with generous initialDelaySeconds for Node.js apps",
+            "Include graceful shutdown handlers (SIGTERM) in the application",
+            "Run smoke tests against staging before production deployment"
+          ]
+        }
+      }
+    },
+    {
+      "input": "Services in our cluster can't resolve external DNS names. Internal service-to-service DNS works fine. Cluster is EKS 1.28. Started happening after a node group update.",
+      "output": {
+        "diagnosis": {
+          "symptoms_observed": [
+            "External DNS resolution failing from pods",
+            "Internal cluster DNS (service.namespace.svc.cluster.local) works",
+            "EKS 1.28 cluster",
+            "Issue started after node group update"
+          ],
+          "most_likely_root_cause": {
+            "description": "CoreDNS upstream forwarding is broken. The node group update likely changed the VPC DNS configuration or security group rules, blocking CoreDNS pods from reaching the VPC DNS resolver (169.254.169.253) or upstream DNS servers.",
+            "confidence": "HIGH"
+          },
+          "verification_commands": [
+            "kubectl get pods -n kube-system -l k8s-app=kube-dns",
+            "kubectl logs -n kube-system -l k8s-app=kube-dns --tail=50",
+            "kubectl exec -n kube-system <coredns-pod> -- nslookup google.com",
+            "kubectl exec -n kube-system <coredns-pod> -- nslookup google.com 169.254.169.253",
+            "kubectl get configmap coredns -n kube-system -o yaml",
+            "aws ec2 describe-security-groups --group-ids <node-sg-id> --query 'SecurityGroups[0].IpPermissionsEgress'"
+          ]
+        },
+        "remediation": {
+          "immediate_fix": [
+            "1. Check if CoreDNS can reach VPC resolver: kubectl exec -n kube-system <coredns-pod> -- nslookup google.com 169.254.169.253",
+            "2. Check node security group allows outbound UDP/TCP 53: aws ec2 describe-security-groups --group-ids <sg-id>",
+            "3. If SG is blocking, add outbound rule: aws ec2 authorize-security-group-egress --group-id <sg-id> --protocol udp --port 53 --cidr 0.0.0.0/0",
+            "4. Restart CoreDNS to pick up networking changes: kubectl rollout restart deployment/coredns -n kube-system"
+          ],
+          "permanent_fix": "Ensure the EKS managed node group security group template includes outbound DNS rules. Add this to your Terraform/IaC: egress rule for UDP/TCP 53 to the VPC CIDR and 0.0.0.0/0. Also verify the VPC has enableDnsSupport and enableDnsHostnames set to true."
+        }
+      }
+    },
+    {
+      "input": "We have a deployment with 3 replicas but one pod keeps getting evicted. It runs for a few hours then disappears. The other 2 pods are fine. Namespace is 'analytics'.",
+      "output": {
+        "diagnosis": {
+          "symptoms_observed": [
+            "Single pod repeatedly evicted from 3-replica deployment",
+            "Pod runs for hours before eviction (not immediate crash)",
+            "Other 2 replicas stable",
+            "Namespace: analytics"
+          ],
+          "most_likely_root_cause": {
+            "description": "The evicted pod is landing on a node with resource pressure (memory or disk). Kubernetes evicts pods from pressured nodes, starting with pods that exceed their resource requests. The other 2 pods are on healthier nodes.",
+            "confidence": "HIGH"
+          },
+          "verification_commands": [
+            "kubectl get events -n analytics --field-selector reason=Evicted --sort-by=.metadata.creationTimestamp",
+            "kubectl describe pod -n analytics <evicted-pod-name> | grep -A 5 'Status:\\|Reason:\\|Message:'",
+            "kubectl get nodes -o custom-columns=NAME:.metadata.name,MEMORY_PRESSURE:.status.conditions[?(@.type==\"MemoryPressure\")].status,DISK_PRESSURE:.status.conditions[?(@.type==\"DiskPressure\")].status",
+            "kubectl top nodes",
+            "kubectl top pod -n analytics",
+            "kubectl get pod -n analytics <pod-name> -o jsonpath='{.spec.nodeName}'"
+          ]
+        },
+        "remediation": {
+          "immediate_fix": [
+            "1. Identify the troubled node: kubectl get pod -n analytics <evicted-pod-name> -o jsonpath='{.spec.nodeName}'",
+            "2. Check node conditions: kubectl describe node <node-name> | grep -A 5 Conditions",
+            "3. Clean up evicted pod ghosts: kubectl delete pods -n analytics --field-selector=status.phase=Failed",
+            "4. Set pod anti-affinity to spread replicas across nodes"
+          ],
+          "permanent_fix": "1. Set proper resource requests AND limits on the analytics pods — requests should match actual steady-state usage.\n2. Add pod anti-affinity to ensure all 3 replicas land on different nodes.\n3. Consider adding a PodDisruptionBudget (minAvailable: 2) to protect against evictions.\n4. If the node is genuinely under-resourced, add more nodes or use larger instance types.",
+          "yaml_change": "spec:\n  template:\n    spec:\n      affinity:\n        podAntiAffinity:\n          preferredDuringSchedulingIgnoredDuringExecution:\n          - weight: 100\n            podAffinityTerm:\n              labelSelector:\n                matchExpressions:\n                - key: app\n                  operator: In\n                  values: [analytics]\n              topologyKey: kubernetes.io/hostname\n      containers:\n      - name: analytics\n        resources:\n          requests:\n            memory: \"512Mi\"\n            cpu: \"250m\"\n          limits:\n            memory: \"1Gi\"\n            cpu: \"500m\""
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Monitoring & Observability Setup Output",
+  "description": "Structured output schema for monitoring and observability architecture design",
+  "type": "object",
+  "required": ["stack_architecture", "metrics", "alerts"],
+  "properties": {
+    "stack_architecture": {
+      "type": "object",
+      "required": ["tools"],
+      "properties": {
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["category", "tool", "justification"],
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": ["metrics", "logging", "tracing", "alerting", "dashboards", "on-call"],
+                "description": "Observability pillar"
+              },
+              "tool": { "type": "string" },
+              "justification": { "type": "string" },
+              "estimated_cost": { "type": "string" }
+            }
+          }
+        },
+        "data_flow_description": { "type": "string" },
+        "installation_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "slos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["service", "sli", "target"],
+        "properties": {
+          "service": { "type": "string" },
+          "sli": { "type": "string", "description": "Service Level Indicator definition" },
+          "target": { "type": "string", "description": "e.g., 99.9%" },
+          "error_budget_30d": { "type": "string" },
+          "measurement_query": { "type": "string", "description": "PromQL or query to measure this SLI" }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "required": ["golden_signals"],
+      "properties": {
+        "golden_signals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["signal", "metric_name", "query"],
+            "properties": {
+              "signal": {
+                "type": "string",
+                "enum": ["latency", "traffic", "errors", "saturation"]
+              },
+              "metric_name": { "type": "string" },
+              "query": { "type": "string" },
+              "unit": { "type": "string" }
+            }
+          }
+        },
+        "recording_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "expression": { "type": "string" },
+              "purpose": { "type": "string" }
+            }
+          }
+        },
+        "cardinality_management": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Rules for managing metric label cardinality"
+        }
+      }
+    },
+    "alerts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "condition", "severity", "response"],
+        "properties": {
+          "name": { "type": "string" },
+          "condition": { "type": "string", "description": "Alert query/expression" },
+          "for_duration": { "type": "string", "description": "How long condition must be true" },
+          "severity": {
+            "type": "string",
+            "enum": ["page", "notify", "log"],
+            "description": "page=wake someone, notify=Slack, log=record"
+          },
+          "response": { "type": "string", "description": "What to do when this fires" },
+          "runbook_url": { "type": "string" }
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "architecture": { "type": "string" },
+        "log_schema": {
+          "type": "object",
+          "description": "Standard fields for structured logging",
+          "properties": {
+            "required_fields": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "field": { "type": "string" },
+                  "type": { "type": "string" },
+                  "description": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "retention_policy": {
+          "type": "object",
+          "properties": {
+            "hot": { "type": "string", "description": "Full-resolution retention" },
+            "warm": { "type": "string", "description": "Downsampled retention" },
+            "cold": { "type": "string", "description": "Archive retention" }
+          }
+        },
+        "key_queries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "query": { "type": "string" },
+              "purpose": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "dashboards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "audience", "panels"],
+        "properties": {
+          "name": { "type": "string" },
+          "audience": {
+            "type": "string",
+            "enum": ["executive", "engineering", "on-call", "debug"]
+          },
+          "panels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string" },
+                "type": {
+                  "type": "string",
+                  "enum": ["graph", "stat", "gauge", "table", "heatmap", "logs"]
+                },
+                "query": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "escalation_policy": {
+      "type": "object",
+      "properties": {
+        "on_call_rotation": { "type": "string" },
+        "escalation_chain": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "level": { "type": "integer" },
+              "wait_time": { "type": "string" },
+              "notify": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
