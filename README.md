@@ -1,8 +1,14 @@
 # DevOps AI Prompt Pack by WireForge
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE) [![Prompts](https://img.shields.io/badge/Prompts-8-orange?style=flat-square)](./system-prompts/) [![GitHub stars](https://img.shields.io/github/stars/srmcguirt/devops-ai-prompt-pack?style=flat-square)](https://github.com/srmcguirt/devops-ai-prompt-pack)
+
 > **8 battle-tested system prompts that turn any LLM into a senior DevOps engineer.** Complete with few-shot examples and structured output schemas for Claude, GPT-4, Cursor, VS Code Copilot, and any OpenAI-compatible API.
 >
-> *Part of the [WireForge](https://wireforge.dev) AI tooling collection.*
+> *Part of the [WireForge](https://srmcguirt.github.io) AI tooling collection.*
+
+> 💎 **Full pack** with all 8 prompts, few-shot examples, output schemas, and future updates → **[Get it on Gumroad ($49) →](https://srmcguirt.gumroad.com)**
+>
+> 📬 **Free sample prompt** — [subscribe at srmcguirt.github.io](https://srmcguirt.github.io)
 
 ---
 
@@ -304,7 +310,7 @@ Container Planner → CI/CD Designer → Cloud Cost Optimizer
 
 WireForge builds production-grade AI tools for engineers — prompt packs, MCP servers, agent boilerplates, and more.
 
-- 🌐 [wireforge.dev](https://wireforge.dev)
+- 🌐 [wireforge.dev](https://srmcguirt.github.io)
 - 🐙 [github.com/srmcguirt](https://github.com/srmcguirt)
 - 🐦 [@wireforge](https://x.com/wireforge)
 
@@ -316,4 +322,4 @@ WireForge builds production-grade AI tools for engineers — prompt packs, MCP s
 
 ---
 
-**Built by [WireForge](https://wireforge.dev) — engineers who've been on-call at 3 AM.** These prompts encode the patterns we wish we'd had when we started.
+**Built by [WireForge](https://srmcguirt.github.io) — engineers who've been on-call at 3 AM.** These prompts encode the patterns we wish we'd had when we started.
