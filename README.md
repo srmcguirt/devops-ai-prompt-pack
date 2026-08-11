@@ -28,6 +28,41 @@
 
 ---
 
+## ⚡ The WireForge Prompt Architecture
+
+Every WireForge prompt follows our **4-Layer Prompt Architecture** — a methodology we developed after studying what separates prompts that produce copy-paste-ready infrastructure from prompts that produce vague advice.
+
+```
+┌─────────────────────────────────────────────┐
+│  Layer 1: IDENTITY                          │
+│  Senior role + specific experience scope    │
+│  "You've managed 100+ node K8s clusters"    │
+├─────────────────────────────────────────────┤
+│  Layer 2: GUARDRAILS                        │
+│  10-15 behavioral constraints that prevent  │
+│  common AI failure modes in DevOps output   │
+│  "Never suggest disabling SELinux"          │
+├─────────────────────────────────────────────┤
+│  Layer 3: OUTPUT BLUEPRINT                  │
+│  Exact section-by-section format with       │
+│  code fences, tables, and structure the AI  │
+│  must follow — no freeform essays           │
+├─────────────────────────────────────────────┤
+│  Layer 4: EDGE CASE LIBRARY                 │
+│  7-8 specific scenarios (multi-cloud,       │
+│  regulated environments, brownfield infra)  │
+│  that trip up generic prompts               │
+└─────────────────────────────────────────────┘
+```
+
+**Why this matters:** Most AI prompt packs give you Layer 1 and maybe Layer 3. Without Layers 2 and 4, the AI will confidently suggest `chmod 777`, recommend `latest` tags in production, or ignore your compliance requirements. Our guardrails and edge cases are sourced from real incidents and production postmortems.
+
+### The 3 AM Test™
+
+Every prompt in this pack passes what we call the **3 AM Test**: if you're woken up at 3 AM by a page, can you paste the prompt output directly into a terminal, a runbook, or an incident channel? If it needs editing first, the prompt isn't done. That's the WireForge standard.
+
+---
+
 ## Quick Start
 
 ### With Claude (Anthropic)
@@ -262,6 +297,22 @@ Container Planner → CI/CD Designer → Cloud Cost Optimizer
 1. Design the container architecture with Dockerfiles and Compose
 2. Create the CI/CD pipeline for building, scanning, and deploying images
 3. Analyze the container infrastructure costs and optimize instance types, spot usage, and scaling
+
+---
+
+## About WireForge
+
+WireForge builds production-grade AI tools for engineers — prompt packs, MCP servers, agent boilerplates, and more.
+
+- 🌐 [wireforge.dev](https://wireforge.dev)
+- 🐙 [github.com/srmcguirt](https://github.com/srmcguirt)
+- 🐦 [@wireforge](https://x.com/wireforge)
+
+**Other products:**
+- [Marketing AI Prompt Pack](https://github.com/srmcguirt/marketing-ai-prompt-pack) — 8 prompts for marketing professionals and agencies
+- [MCP Server Starter Kit](https://github.com/srmcguirt/mcp-server-starter-kit) — Production-ready MCP server boilerplate
+- [Claude Agent Boilerplate](https://github.com/srmcguirt/claude-agent-boilerplate) — Build production Claude agents fast
+- [Prompt Template Library](https://github.com/srmcguirt/prompt-template-library) — 60+ developer prompt templates
 
 ---
 
