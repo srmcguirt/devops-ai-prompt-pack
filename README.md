@@ -4,11 +4,11 @@
 
 > **8 battle-tested system prompts that turn any LLM into a senior DevOps engineer.** Complete with few-shot examples and structured output schemas for Claude, GPT-4, Cursor, VS Code Copilot, and any OpenAI-compatible API.
 >
-> *Part of the [WireForge](https://srmcguirt.github.io) AI tooling collection.*
+> *Part of the [WireForge](https://wireforge.fellwork.workers.dev) AI tooling collection.*
 
 > 💎 **Full pack** with all 8 prompts, few-shot examples, output schemas, and future updates → **[Get it on Gumroad ($49) →](https://srmcguirt.gumroad.com)**
 >
-> 📬 **Free sample prompt** — [subscribe at srmcguirt.github.io](https://srmcguirt.github.io)
+> 📬 **Free sample prompt** — [subscribe at wireforge.fellwork.workers.dev](https://wireforge.fellwork.workers.dev)
 
 ---
 
@@ -256,6 +256,19 @@ AI: [Returns complete monitoring architecture with:]
 
 ---
 
+
+---
+
+## 💼 Get the Full Pack
+
+**[DevOps AI Prompt Pack — $29 on Gumroad](https://srmcguirt.gumroad.com/l/devops-prompt-pack)**
+
+8 specialist system prompts, MIT licensed, plain Markdown — drop into Claude, GPT-4, or Cursor. No vendor lock-in.
+
+→ [Full product lineup](https://wireforge.fellwork.workers.dev)
+
+---
+
 ## License
 
 MIT License — use in personal projects, commercial products, SaaS apps, consulting engagements. See [LICENSE](LICENSE) for details.
@@ -310,7 +323,7 @@ Container Planner → CI/CD Designer → Cloud Cost Optimizer
 
 WireForge builds production-grade AI tools for engineers — prompt packs, MCP servers, agent boilerplates, and more.
 
-- 🌐 [wireforge.dev](https://srmcguirt.github.io)
+- 🌐 [wireforge.dev](https://wireforge.fellwork.workers.dev)
 - 🐙 [github.com/srmcguirt](https://github.com/srmcguirt)
 - 🐦 [@wireforge](https://x.com/wireforge)
 
@@ -322,4 +335,4 @@ WireForge builds production-grade AI tools for engineers — prompt packs, MCP s
 
 ---
 
-**Built by [WireForge](https://srmcguirt.github.io) — engineers who've been on-call at 3 AM.** These prompts encode the patterns we wish we'd had when we started.
+**Built by [WireForge](https://wireforge.fellwork.workers.dev) — engineers who've been on-call at 3 AM.** These prompts encode the patterns we wish we'd had when we started.
