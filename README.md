@@ -65,7 +65,7 @@ Every prompt follows our **4-Layer Prompt Architecture** — a methodology we de
 
 ### The 3 AM Test™
 
-Every prompt in this pack passes what we call the **3 AM Test**: if you're woken up at 3 AM by a page, can you paste the prompt output directly into a terminal, a runbook, or an incident channel? If it needs editing first, the prompt isn't done. That's the WireForge standard.
+Every prompt in this pack passes what we call the **3 AM Test**: if you're woken up at 3 AM by a page, can you paste the prompt output directly into a terminal, a runbook, or an incident channel? If it needs editing first, the prompt isn't done. That's the standard.
 
 ---
 
@@ -319,9 +319,9 @@ Container Planner → CI/CD Designer → Cloud Cost Optimizer
 
 ---
 
-## About WireForge
+## About
 
-WireForge builds production-grade AI tools for engineers — prompt packs, MCP servers, agent boilerplates, and more.
+Shane McGuirt builds production-grade AI tools for engineers — prompt packs, MCP servers, agent boilerplates, and more.
 
 - 🌐 [srmcguirt.dev](https://srmcguirt.dev)
 - 🐙 [github.com/srmcguirt](https://github.com/srmcguirt)
