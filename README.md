@@ -81,7 +81,7 @@ Every prompt in this pack passes what we call the **3 AM Test**: if you're woken
 Create a production VPC in AWS us-east-1 with public/private subnets, NAT gateways, and VPC flow logs.
 ```
 
-### With GPT-4 / ChatGPT
+### With GPT-5.6 / ChatGPT
 
 1. Open ChatGPT → Settings → Custom Instructions → System Prompt
 2. Paste the system prompt content
@@ -102,7 +102,7 @@ with open("output-schemas/01-iac-generator-schema.json") as f:
     schema = json.load(f)
 
 response = client.chat.completions.create(
-    model="gpt-4o",
+    model="gpt-5.6",
     messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": "Create an S3 bucket with versioning, encryption, and lifecycle policies"}
@@ -245,7 +245,7 @@ AI: [Returns complete monitoring architecture with:]
 | Platform | System Prompt | Few-Shot Examples | Structured Output |
 |----------|:---:|:---:|:---:|
 | Claude (Anthropic) | ✅ | ✅ | ✅ (tool_use) |
-| GPT-4o / GPT-4 (OpenAI) | ✅ | ✅ | ✅ (json_schema) |
+| GPT-5.6 (OpenAI) | ✅ | ✅ | ✅ (json_schema) |
 | Claude Code | ✅ | ✅ | ✅ |
 | Cursor | ✅ | ✅ | — |
 | VS Code Copilot | ✅ | ✅ | — |
