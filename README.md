@@ -2,11 +2,11 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE) [![Prompts](https://img.shields.io/badge/Prompts-8-orange?style=flat-square)](./system-prompts/) [![GitHub stars](https://img.shields.io/github/stars/srmcguirt/devops-ai-prompt-pack?style=flat-square)](https://github.com/srmcguirt/devops-ai-prompt-pack)
 
-> **8 battle-tested system prompts that turn any LLM into a senior DevOps engineer.** Complete with few-shot examples and structured output schemas for Claude, GPT-4, Cursor, VS Code Copilot, and any OpenAI-compatible API.
+> **8 battle-tested system prompts that turn any LLM into a senior DevOps engineer.** Built for Claude, GPT-4, Cursor, VS Code Copilot, and any OpenAI-compatible API.
 >
 > *Part of the [Shane McGuirt](https://srmcguirt.dev) AI tooling collection.*
 
-> 💎 **Full pack** with all 8 prompts, few-shot examples, output schemas, and future updates → **[Get it on Gumroad ($49) →](https://srmcguirt.gumroad.com)**
+> 💎 **Full pack** with all 8 prompts, few-shot examples, output schemas, and future updates → **[Get it on Gumroad ($29) →](https://srmcguirt.gumroad.com/l/devops-prompt-pack)**
 >
 > 📬 **Free sample prompt** — [subscribe at srmcguirt.dev](https://srmcguirt.dev)
 
@@ -28,15 +28,15 @@
 ### What Makes These Different from Free Prompts
 
 - **200+ words each** — These are comprehensive system prompts with role definitions, behavioral constraints, output format specifications, and edge case handling. Not one-liner instructions.
-- **Real few-shot examples** — Each prompt includes 3-5 realistic input/output pairs with actual Terraform code, kubectl commands, YAML manifests, and dollar-amount cost analyses.
-- **Structured output schemas** — JSON Schema files for every prompt, ready to use with OpenAI's structured output, Claude's tool use, or any JSON-mode API. Parse AI responses programmatically.
+- **Real few-shot examples** (full pack) — Each prompt includes 3-5 realistic input/output pairs with actual Terraform code, kubectl commands, YAML manifests, and dollar-amount cost analyses.
+- **Structured output schemas** (full pack) — JSON Schema files for every prompt, ready to use with OpenAI's structured output, Claude's tool use, or any JSON-mode API. Parse AI responses programmatically.
 - **Edge case coverage** — Each prompt handles the hard cases: multi-cloud setups, monorepo CI/CD, security incidents with legal implications, GPU workload cost optimization, and more.
 
 ---
 
 ## ⚡ The Prompt Architecture
 
-Every prompt follows our **4-Layer Prompt Architecture** — a methodology we developed after studying what separates prompts that produce copy-paste-ready infrastructure from prompts that produce vague advice.
+Every prompt follows a **4-Layer Prompt Architecture** — a structure that emerged from studying what separates prompts that produce copy-paste-ready infrastructure from prompts that produce vague advice.
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -174,7 +174,7 @@ devops-ai-prompt-pack/
 │   ├── 07-security-audit.md
 │   └── 08-monitoring-setup.md
 │
-├── few-shot-examples/        # Realistic input/output pairs (JSON)
+├── few-shot-examples/        # Realistic input/output pairs (JSON)  [full pack]
 │   ├── 01-iac-generator-examples.json
 │   ├── 02-k8s-debugger-examples.json
 │   ├── 03-cicd-designer-examples.json
@@ -184,7 +184,7 @@ devops-ai-prompt-pack/
 │   ├── 07-security-audit-examples.json
 │   └── 08-monitoring-setup-examples.json
 │
-├── output-schemas/           # JSON Schema for structured output (JSON)
+├── output-schemas/           # JSON Schema for structured output (JSON)  [full pack]
 │   ├── 01-iac-generator-schema.json
 │   ├── 02-k8s-debugger-schema.json
 │   ├── 03-cicd-designer-schema.json
