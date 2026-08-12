@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE) [![Prompts](https://img.shields.io/badge/Prompts-8-orange?style=flat-square)](./system-prompts/) [![GitHub stars](https://img.shields.io/github/stars/srmcguirt/devops-ai-prompt-pack?style=flat-square)](https://github.com/srmcguirt/devops-ai-prompt-pack)
 
-> **8 battle-tested system prompts that turn any LLM into a senior DevOps engineer. Complete with few-shot examples and structured output schemas for Claude, GPT-4o/GPT-5, Cursor, VS Code Copilot, and any OpenAI-compatible API.
+> **8 battle-tested system prompts that turn any LLM into a senior DevOps engineer.** Complete with few-shot examples and structured output schemas for Claude, GPT-4, Cursor, VS Code Copilot, and any OpenAI-compatible API.
 >
 > *Part of the [Shane McGuirt](https://srmcguirt.dev) AI tooling collection.*
 
@@ -40,24 +40,24 @@ Every prompt follows our **4-Layer Prompt Architecture** — a methodology we de
 
 ```
 ┌─────────────────────────────────────────────┐
-│ Layer 1: IDENTITY │
-│ Senior role + specific experience scope │
-│ "You've managed 100+ node K8s clusters" │
+│  Layer 1: IDENTITY                          │
+│  Senior role + specific experience scope    │
+│  "You've managed 100+ node K8s clusters"    │
 ├─────────────────────────────────────────────┤
-│ Layer 2: GUARDRAILS │
-│ 10-15 behavioral constraints that prevent │
-│ common AI failure modes in DevOps output │
-│ "Never suggest disabling SELinux" │
+│  Layer 2: GUARDRAILS                        │
+│  10-15 behavioral constraints that prevent  │
+│  common AI failure modes in DevOps output   │
+│  "Never suggest disabling SELinux"          │
 ├─────────────────────────────────────────────┤
-│ Layer 3: OUTPUT BLUEPRINT │
-│ Exact section-by-section format with │
-│ code fences, tables, and structure the AI │
-│ must follow — no freeform essays │
+│  Layer 3: OUTPUT BLUEPRINT                  │
+│  Exact section-by-section format with       │
+│  code fences, tables, and structure the AI  │
+│  must follow — no freeform essays           │
 ├─────────────────────────────────────────────┤
-│ Layer 4: EDGE CASE LIBRARY │
-│ 7-8 specific scenarios (multi-cloud, │
-│ regulated environments, brownfield infra) │
-│ that trip up generic prompts │
+│  Layer 4: EDGE CASE LIBRARY                 │
+│  7-8 specific scenarios (multi-cloud,       │
+│  regulated environments, brownfield infra)  │
+│  that trip up generic prompts               │
 └─────────────────────────────────────────────┘
 ```
 
@@ -81,7 +81,7 @@ Every prompt in this pack passes what we call the **3 AM Test**: if you're woken
 Create a production VPC in AWS us-east-1 with public/private subnets, NAT gateways, and VPC flow logs.
 ```
 
-### With GPT-4o / ChatGPT
+### With GPT-4 / ChatGPT
 
 1. Open ChatGPT → Settings → Custom Instructions → System Prompt
 2. Paste the system prompt content
@@ -95,25 +95,25 @@ client = OpenAI()
 
 # Load system prompt
 with open("system-prompts/01-iac-generator.md") as f:
- system_prompt = f.read()
+    system_prompt = f.read()
 
 # Load output schema
 with open("output-schemas/01-iac-generator-schema.json") as f:
- schema = json.load(f)
+    schema = json.load(f)
 
 response = client.chat.completions.create(
- model="gpt-4o",
- messages=[
- {"role": "system", "content": system_prompt},
- {"role": "user", "content": "Create an S3 bucket with versioning, encryption, and lifecycle policies"}
- ],
- response_format={
- "type": "json_schema",
- "json_schema": {
- "name": "iac_output",
- "schema": schema
- }
- }
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": "Create an S3 bucket with versioning, encryption, and lifecycle policies"}
+    ],
+    response_format={
+        "type": "json_schema",
+        "json_schema": {
+            "name": "iac_output",
+            "schema": schema
+        }
+    }
 )
 ```
 
@@ -147,14 +147,14 @@ const examples = JSON.parse(readFileSync('few-shot-examples/04-cloud-cost-optimi
 
 // Build messages array with few-shot examples
 const messages = [
- { role: 'system', content: systemPrompt },
- // Add few-shot examples as conversation history
- ...examples.examples.flatMap(ex => [
- { role: 'user', content: ex.input },
- { role: 'assistant', content: JSON.stringify(ex.output) }
- ]),
- // Actual user query
- { role: 'user', content: 'Our AWS bill is $25,000/month. Here is the breakdown...' }
+  { role: 'system', content: systemPrompt },
+  // Add few-shot examples as conversation history
+  ...examples.examples.flatMap(ex => [
+    { role: 'user', content: ex.input },
+    { role: 'assistant', content: JSON.stringify(ex.output) }
+  ]),
+  // Actual user query
+  { role: 'user', content: 'Our AWS bill is $25,000/month. Here is the breakdown...' }
 ];
 ```
 
@@ -164,35 +164,35 @@ const messages = [
 
 ```
 devops-ai-prompt-pack/
-├── system-prompts/ # 8 expert system prompts (Markdown)
-│ ├── 01-iac-generator.md
-│ ├── 02-k8s-debugger.md
-│ ├── 03-cicd-designer.md
-│ ├── 04-cloud-cost-optimizer.md
-│ ├── 05-incident-response.md
-│ ├── 06-container-planner.md
-│ ├── 07-security-audit.md
-│ └── 08-monitoring-setup.md
+├── system-prompts/           # 8 expert system prompts (Markdown)
+│   ├── 01-iac-generator.md
+│   ├── 02-k8s-debugger.md
+│   ├── 03-cicd-designer.md
+│   ├── 04-cloud-cost-optimizer.md
+│   ├── 05-incident-response.md
+│   ├── 06-container-planner.md
+│   ├── 07-security-audit.md
+│   └── 08-monitoring-setup.md
 │
-├── few-shot-examples/ # Realistic input/output pairs (JSON)
-│ ├── 01-iac-generator-examples.json
-│ ├── 02-k8s-debugger-examples.json
-│ ├── 03-cicd-designer-examples.json
-│ ├── 04-cloud-cost-optimizer-examples.json
-│ ├── 05-incident-response-examples.json
-│ ├── 06-container-planner-examples.json
-│ ├── 07-security-audit-examples.json
-│ └── 08-monitoring-setup-examples.json
+├── few-shot-examples/        # Realistic input/output pairs (JSON)
+│   ├── 01-iac-generator-examples.json
+│   ├── 02-k8s-debugger-examples.json
+│   ├── 03-cicd-designer-examples.json
+│   ├── 04-cloud-cost-optimizer-examples.json
+│   ├── 05-incident-response-examples.json
+│   ├── 06-container-planner-examples.json
+│   ├── 07-security-audit-examples.json
+│   └── 08-monitoring-setup-examples.json
 │
-├── output-schemas/ # JSON Schema for structured output (JSON)
-│ ├── 01-iac-generator-schema.json
-│ ├── 02-k8s-debugger-schema.json
-│ ├── 03-cicd-designer-schema.json
-│ ├── 04-cloud-cost-optimizer-schema.json
-│ ├── 05-incident-response-schema.json
-│ ├── 06-container-planner-schema.json
-│ ├── 07-security-audit-schema.json
-│ └── 08-monitoring-setup-schema.json
+├── output-schemas/           # JSON Schema for structured output (JSON)
+│   ├── 01-iac-generator-schema.json
+│   ├── 02-k8s-debugger-schema.json
+│   ├── 03-cicd-designer-schema.json
+│   ├── 04-cloud-cost-optimizer-schema.json
+│   ├── 05-incident-response-schema.json
+│   ├── 06-container-planner-schema.json
+│   ├── 07-security-audit-schema.json
+│   └── 08-monitoring-setup-schema.json
 │
 ├── README.md
 ├── LICENSE
@@ -245,7 +245,7 @@ AI: [Returns complete monitoring architecture with:]
 | Platform | System Prompt | Few-Shot Examples | Structured Output |
 |----------|:---:|:---:|:---:|
 | Claude (Anthropic) | ✅ | ✅ | ✅ (tool_use) |
-| GPT-4o / GPT-5 (OpenAI) | ✅ | ✅ | ✅ (json_schema) |
+| GPT-4o / GPT-4 (OpenAI) | ✅ | ✅ | ✅ (json_schema) |
 | Claude Code | ✅ | ✅ | ✅ |
 | Cursor | ✅ | ✅ | — |
 | VS Code Copilot | ✅ | ✅ | — |
